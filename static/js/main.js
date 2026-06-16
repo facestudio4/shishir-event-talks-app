@@ -1,5 +1,6 @@
 // State Management
 let allUpdates = [];
+let currentlyFilteredUpdates = [];
 let activeTypeFilter = 'all';
 let searchQuery = '';
 
@@ -26,6 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     // Refresh Button
     btnRefresh.addEventListener('click', loadReleases);
+
+    // Export CSV Button
+    const btnExport = document.getElementById('btn-export');
+    if (btnExport) {
+        btnExport.addEventListener('click', exportToCSV);
+    }
 
     // Search Input (Debounced-like reactivity)
     searchInput.addEventListener('input', (e) => {
@@ -144,6 +151,7 @@ function applyFilters() {
         );
     }
 
+    currentlyFilteredUpdates = filtered;
     renderFeed(filtered);
 }
 
@@ -202,6 +210,13 @@ function renderFeed(updates) {
                             <path fill="currentColor" d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                         </svg>
                     </a>
+                    <button class="btn btn-secondary btn-sm" onclick="copyUpdate(${JSON.stringify(update.plainText).replace(/"/g, '&quot;')}, this)" title="Copy text to clipboard">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy
+                    </button>
                     <button class="btn btn-twitter btn-sm" onclick="tweetUpdate('${update.date}', '${update.type}', ${JSON.stringify(update.plainText).replace(/"/g, '&quot;')}, '${update.link}')">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -325,4 +340,68 @@ function showErrorState(message) {
             </div>
         `;
     }
+}
+
+// Copy Update to Clipboard Function
+function copyUpdate(text, button) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalHTML = button.innerHTML;
+        button.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Copied!
+        `;
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy text: ', err);
+        showAlert('Failed to copy text to clipboard.', 'error');
+    });
+}
+
+// Export Currently Filtered/Searched Updates to CSV
+function exportToCSV() {
+    if (currentlyFilteredUpdates.length === 0) {
+        showAlert('No data available to export.', 'error');
+        return;
+    }
+    
+    const headers = ['Date', 'Category', 'Description', 'Link'];
+    const rows = currentlyFilteredUpdates.map(u => [
+        u.date,
+        u.type,
+        u.plainText,
+        u.link
+    ]);
+    
+    const escapeCSVField = (field) => {
+        if (field === null || field === undefined) return '';
+        let stringValue = String(field);
+        stringValue = stringValue.replace(/"/g, '""');
+        if (/[",\n\r]/.test(stringValue)) {
+            return `"${stringValue}"`;
+        }
+        return stringValue;
+    };
+    
+    const csvContent = [
+        headers.map(escapeCSVField).join(','),
+        ...rows.map(row => row.map(escapeCSVField).join(','))
+    ].join('\r\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bigquery_release_notes_${activeTypeFilter}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showAlert('Successfully exported CSV.', 'success');
 }
