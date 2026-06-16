@@ -19,6 +19,14 @@ const statIssues = document.getElementById('stat-issues');
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize Theme
+    const savedTheme = localStorage.getItem('theme');
+    const themeCheckbox = document.getElementById('theme-checkbox');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        if (themeCheckbox) themeCheckbox.checked = true;
+    }
+    
     setupEventListeners();
     loadReleases();
 });
@@ -27,6 +35,20 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     // Refresh Button
     btnRefresh.addEventListener('click', loadReleases);
+
+    // Theme Toggle Switch
+    const themeCheckbox = document.getElementById('theme-checkbox');
+    if (themeCheckbox) {
+        themeCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('light-theme');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.classList.remove('light-theme');
+                localStorage.setItem('theme', 'dark');
+            }
+        });
+    }
 
     // Export CSV Button
     const btnExport = document.getElementById('btn-export');
